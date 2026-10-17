@@ -45,7 +45,13 @@ from inspect_ai.log import (
     read_eval_log,
     write_eval_log,
 )
-from inspect_ai.model import ChatMessage, ChatMessageUser, ModelOutput, get_model
+from inspect_ai.model import (
+    ChatMessage,
+    ChatMessageSystem,
+    ChatMessageUser,
+    ModelOutput,
+    get_model,
+)
 from inspect_ai.model._model import requested_model
 from inspect_ai.solver import Generate, TaskState, generate, solver, use_tools
 from inspect_ai.tool import Tool, tool
@@ -382,6 +388,26 @@ def test_messages_df_columns():
 def test_messages_df_filter():
     df = messages_df(LOGS_DIR, filter=lambda m: m.role == "assistant")
     assert len(df) == 14
+
+
+@pytest.mark.parametrize("parallel", [False, 2])
+def test_messages_df_keeps_shared_input_messages(
+    tmp_path: Path, parallel: bool | int
+) -> None:
+    task = Task(
+        dataset=[
+            Sample(
+                input=[
+                    ChatMessageSystem(content="Be terse."),
+                    ChatMessageUser(content="Say hi."),
+                ]
+            )
+        ],
+        epochs=2,
+    )
+    eval(task, model=["mockllm/a", "mockllm/b"], log_dir=str(tmp_path))
+    df = messages_df(str(tmp_path), parallel=parallel)
+    assert df.groupby("sample_id").size().tolist() == [3, 3, 3, 3]
 
 
 def test_events_df():
